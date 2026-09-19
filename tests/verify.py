@@ -103,6 +103,17 @@ class SiteChecks(unittest.TestCase):
         for asset in assets:
             self.assertTrue((ROOT / asset).is_file(), asset)
 
+    def test_responsive_portrait_formats(self):
+        sources = DOC.tags("source")
+        self.assertEqual([source.get("type") for source in sources], ["image/avif", "image/webp"])
+        for source, extension in zip(sources, ("avif", "webp")):
+            self.assertEqual(source["srcset"], f"images/portrait-480.{extension} 480w, images/portrait-960.{extension} 960w")
+            self.assertIn("sizes", source)
+        for size in (480, 960):
+            self.assertIn(b"ftypavif", (ROOT / f"images/portrait-{size}.avif").read_bytes()[:64])
+        portrait, = [img for img in DOC.tags("img") if "fetchpriority" in img]
+        self.assertEqual(portrait["srcset"], "images/portrait-480.jpg 480w, images/portrait-960.jpg 960w")
+
     def test_javascript_syntax(self):
         for script in ("theme.js", "script.js", "tests/browser.cjs"):
             result = subprocess.run(["node", "--check", str(ROOT / script)], capture_output=True, text=True)

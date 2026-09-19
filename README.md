@@ -29,7 +29,8 @@ PLAYWRIGHT_MODULE=/absolute/path/to/playwright node tests/browser.cjs
 ```
 
 The browser check uses Chromium and checks responsive overflow, image loading,
-keyboard navigation, themes and persistence, system changes, reduced motion,
+keyboard navigation, AVIF decoding, themes and persistence, system changes, reduced motion,
+pointer/scroll network response and offscreen animation suspension,
 disabled storage, disabled JavaScript, and browser errors. Screenshots and traces
 stay in the ignored `.superpowers/sdd/website-profile-plan/evidence/` directory.
 Set `BASE_URL` or `EVIDENCE_DIR` to override the defaults.
@@ -40,9 +41,11 @@ Set `BASE_URL` or `EVIDENCE_DIR` to override the defaults.
   company joining year, not the year the current title was obtained.
 - The theme control cycles through system, light, and dark. Without JavaScript,
   the page follows the system preference and all content remains available.
-- The Canvas network is decorative. It becomes still with reduced motion and
+- The Canvas network subtly follows pointer movement and rotates with page scrolling.
+  Passive input handlers update state for its existing animation loop without intercepting links
+  or touch scrolling. It becomes still with reduced motion and
   stops animating when the hero is offscreen or the document is hidden.
-- Portraits are resized derivatives of Damian's supplied photo, with WebP sources
-  and JPEG fallbacks. Icons and the 1200 × 630 social preview are committed assets.
+- Portraits are resized derivatives of Damian's supplied photo, with AVIF and WebP
+  sources and JPEG fallbacks. Icons and the 1200 × 630 social preview are committed assets.
 - Keep the canonical and social URLs in sync if a custom domain is added.
 - Work-card illustrations are decorative interpretations, not product screenshots.

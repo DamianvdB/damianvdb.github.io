@@ -66,12 +66,31 @@
   const context = canvas.getContext('2d');
   if (!context) return;
   const scene = document.querySelector('.portrait-scene');
+  const hero = canvas.parentElement;
   let width = 0;
   let height = 0;
   let frame = 0;
   let visible = true;
   let ink;
   let center = { x: 0, y: 0, radius: 0 };
+  let origin = { x: 0, y: 0 };
+  let pointer = { x: 0, y: 0 };
+  let scrollPosition = window.scrollY;
+  const clamp = value => Math.max(-1, Math.min(1, value));
+
+  // Listen on the hero so the decorative canvas remains transparent to links and touch scrolling.
+  // Input handlers only update state; the existing visible-only frame loop does the painting.
+  hero.addEventListener('pointermove', event => {
+    if (reduceMotion.matches) return;
+    pointer = {
+      x: clamp((event.clientX + window.scrollX - origin.x - center.x) / center.radius),
+      y: clamp((event.clientY + window.scrollY - origin.y - center.y) / center.radius)
+    };
+  }, { passive: true });
+  const resetPointer = () => { pointer = { x: 0, y: 0 }; };
+  hero.addEventListener('pointerleave', resetPointer, { passive: true });
+  hero.addEventListener('pointercancel', resetPointer, { passive: true });
+  window.addEventListener('scroll', () => { scrollPosition = window.scrollY; }, { passive: true });
   const nodes = Array.from({ length: 22 }, (_, index) => ({
     angle: index * Math.PI * 2 / 22,
     orbit: 1.08 + (index % 3) * 0.12,
@@ -82,11 +101,15 @@
     context.clearRect(0, 0, width, height);
     context.strokeStyle = ink;
     context.fillStyle = ink;
+    const moving = !reduceMotion.matches;
+    const scroll = moving ? clamp(scrollPosition / Math.max(height, 1)) : 0;
     const points = nodes.map(node => {
-      const drift = reduceMotion.matches ? 0 : Math.sin(time / 7000 + node.phase) * 6;
+      const drift = moving ? Math.sin(time / 7000 + node.phase) * 6 : 0;
+      const attraction = moving ? 12 * node.orbit : 0;
+      const angle = node.angle + scroll * .09;
       return {
-        x: center.x + Math.cos(node.angle) * (center.radius * node.orbit + drift),
-        y: center.y + Math.sin(node.angle) * (center.radius * node.orbit + drift)
+        x: center.x + Math.cos(angle) * (center.radius * node.orbit + drift) + pointer.x * attraction,
+        y: center.y + Math.sin(angle) * (center.radius * node.orbit + drift) + pointer.y * attraction - scroll * 20
       };
     });
     points.forEach((point, index) => {
@@ -120,6 +143,7 @@
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     width = bounds.width;
     height = bounds.height;
+    origin = { x: bounds.left + window.scrollX, y: bounds.top + window.scrollY };
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -131,7 +155,10 @@
     render();
   }
   repaintNetwork = render;
-  reduceMotion.addEventListener('change', render);
+  reduceMotion.addEventListener('change', () => {
+    resetPointer();
+    render();
+  });
   document.addEventListener('visibilitychange', render);
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(([entry]) => {

@@ -80,6 +80,10 @@ class ProfilePage {
         assert.equal(await page.evaluate(() => document.activeElement.id), 'main');
         assert.match(await page.locator('time').textContent(), /^\d{2}:\d{2}$/);
         assert.equal(await page.getByRole('article').count(), 4);
+        assert.match(await page.getByRole('img', { name: /Damian van den Berg smiling/ }).evaluate(async img => {
+          await img.decode();
+          return img.currentSrc;
+        }), /portrait-(480|960)\.avif$/);
         // Lazy images are checked after the full-page capture has scrolled through them.
         await profile.capture('desktop-light');
         assert.deepEqual(await page.locator('img').evaluateAll(images => images.filter(img => !img.complete || !img.naturalWidth).map(img => img.getAttribute('src'))), []);
@@ -137,6 +141,56 @@ class ProfilePage {
         await profile.page.getByRole('heading', { name: /Thoughtful work/ }).waitFor();
         await profile.capture('no-javascript');
       }),
+      scenario('network-interaction', { viewport: { width: 1440, height: 1000 }, colorScheme: 'light', reducedMotion: 'no-preference' }, async (profile, context) => {
+        // Hold animation time constant so pixel changes prove input response, not ambient drift.
+        await context.addInitScript(() => {
+          const requestFrame = window.requestAnimationFrame.bind(window);
+          window.requestAnimationFrame = callback => requestFrame(() => callback(1000));
+          window.__networkDraws = 0;
+          const clear = CanvasRenderingContext2D.prototype.clearRect;
+          CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+            if (this.canvas.id === 'hero-network') window.__networkDraws += 1;
+            return clear.apply(this, args);
+          };
+        });
+        await profile.open();
+        const page = profile.page;
+        const canvas = page.locator('canvas');
+        const pixels = () => canvas.evaluate(element => element.toDataURL());
+        const frames = () => page.evaluate(async () => {
+          for (let frame = 0; frame < 4; frame++) await new Promise(requestAnimationFrame);
+        });
+        await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
+        await frames();
+        const initial = await pixels();
+        await page.mouse.move(1120, 360);
+        await frames();
+        assert.ok(await pixels() !== initial, 'Pointer movement changes the network with animation time fixed');
+        await page.screenshot({ path: path.join(evidence, 'network-pointer.png'), animations: 'disabled' });
+        await page.mouse.move(10, 10);
+        await frames();
+        const beforeScroll = await pixels();
+        await page.evaluate(() => window.scrollTo({ top: 160, behavior: 'instant' }));
+        await frames();
+        assert.ok(await pixels() !== beforeScroll, 'Scrolling changes the network with animation time fixed');
+        await page.screenshot({ path: path.join(evidence, 'network-scroll.png'), animations: 'disabled' });
+        assert.equal(await canvas.evaluate(element => getComputedStyle(element).pointerEvents), 'none');
+        await page.getByRole('link', { name: 'Explore my work' }).click();
+        assert.equal(new URL(page.url()).hash, '#work', 'Hero link remains clickable through the decoration');
+        await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
+        await frames();
+        const offscreenDraws = await page.evaluate(() => window.__networkDraws);
+        await frames();
+        assert.equal(await page.evaluate(() => window.__networkDraws), offscreenDraws, 'Offscreen network stays paused');
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+        await frames();
+        const still = await pixels();
+        await page.mouse.move(1120, 360);
+        await page.evaluate(() => window.scrollTo({ top: 160, behavior: 'instant' }));
+        await frames();
+        assert.ok(await pixels() === still, 'Reduced motion ignores pointer and scroll input');
+      }),
       scenario('blocked-storage', { viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' }, async (profile, context) => {
         await context.addInitScript(() => {
           Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Blocked', 'SecurityError'); } });
@@ -152,7 +206,7 @@ class ProfilePage {
     for (const failure of failures) console.error(failure.reason);
     assert.equal(failures.length, 0, 'Browser scenario failures');
     assert.deepEqual(errors, [], 'Browser errors');
-    console.log('PASS 7 browser scenarios; no local resource, console, or uncaught JavaScript errors.');
+    console.log('PASS 8 browser scenarios; no local resource, console, or uncaught JavaScript errors.');
   } finally {
     await browser.close();
   }
