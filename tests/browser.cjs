@@ -120,7 +120,7 @@ class ProfilePage {
         await page.waitForFunction(() => document.querySelector('meta[name="theme-color"]').content === '#10251f');
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         const still = await page.locator('canvas').evaluate(canvas => canvas.toDataURL());
-        await page.getByRole('link', { name: 'Explore my work' }).hover();
+        await page.getByRole('link', { name: 'See what I’ve built' }).hover();
         assert.ok(await page.locator('canvas').evaluate(canvas => canvas.toDataURL()) === still, 'Reduced-motion Canvas remains unchanged');
         assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior), 'auto');
         assert.deepEqual(await page.evaluate(() => document.getAnimations().filter(animation => animation.playState === 'running').map(animation => animation.id)), []);
@@ -140,7 +140,7 @@ class ProfilePage {
         await profile.open();
         assert.equal(await profile.page.getByRole('article').count(), 4);
         assert.equal(await profile.theme.count(), 0);
-        await profile.page.getByRole('heading', { name: /Thoughtful work/ }).waitFor();
+        await profile.page.getByRole('heading', { name: /I build things/ }).waitFor();
         await profile.capture('no-javascript');
       }),
       scenario('network-interaction', { viewport: { width: 1440, height: 1000 }, colorScheme: 'light', reducedMotion: 'no-preference' }, async (profile, context) => {
@@ -180,7 +180,7 @@ class ProfilePage {
         assert.ok(await pixels() !== beforeScroll, 'Scrolling changes the network with animation time fixed');
         await page.screenshot({ path: path.join(evidence, 'network-scroll.png'), animations: 'disabled' });
         assert.equal(await canvas.evaluate(element => getComputedStyle(element).pointerEvents), 'none');
-        await page.getByRole('link', { name: 'Explore my work' }).click();
+        await page.getByRole('link', { name: 'See what I’ve built' }).click();
         assert.equal(new URL(page.url()).hash, '#work', 'Hero link remains clickable through the decoration');
         await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
         await frames();
