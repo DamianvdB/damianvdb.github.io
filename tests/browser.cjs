@@ -238,7 +238,7 @@ class ProfilePage {
       scenario('homely-focus', { viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' }, async profile => {
         await profile.open();
         const page = profile.page;
-        const link = page.getByRole('link', { name: 'Discover Homely' });
+        const link = page.getByRole('link', { name: 'Discover homely' });
         for (const colorScheme of ['light', 'dark']) {
           await page.emulateMedia({ colorScheme });
           await link.focus();
@@ -258,8 +258,8 @@ class ProfilePage {
             return { ratio: (Math.max(outline, background) + .05) / (Math.min(outline, background) + .05), width: parseFloat(style.outlineWidth) };
           });
           assert.ok(contrast.width >= 3, 'Focus outline stays at least 3px wide');
-          assert.ok(contrast.ratio >= 3, colorScheme + ' Homely focus contrast must be at least 3:1; got ' + contrast.ratio.toFixed(2));
-          console.log('Homely focus contrast (' + colorScheme + '): ' + contrast.ratio.toFixed(2) + ':1');
+          assert.ok(contrast.ratio >= 3, colorScheme + ' homely focus contrast must be at least 3:1; got ' + contrast.ratio.toFixed(2));
+          console.log('homely focus contrast (' + colorScheme + '): ' + contrast.ratio.toFixed(2) + ':1');
           await page.screenshot({ path: path.join(evidence, 'homely-focus-' + colorScheme + '.png'), animations: 'disabled' });
         }
       }),

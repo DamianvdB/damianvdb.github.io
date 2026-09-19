@@ -31,7 +31,7 @@ PLAYWRIGHT_MODULE=/absolute/path/to/playwright node tests/browser.cjs
 The browser check uses Chromium and checks responsive overflow, image loading,
 keyboard navigation, AVIF decoding, themes and persistence, system changes, reduced motion,
 pointer/scroll network response and offscreen animation suspension,
-constrained-device fallback, Homely focus contrast, disabled storage, disabled
+constrained-device fallback, homely focus contrast, disabled storage, disabled
 JavaScript, and browser errors. Screenshots and traces
 stay in the ignored `.superpowers/sdd/website-profile-plan/evidence/` directory.
 Set `BASE_URL` or `EVIDENCE_DIR` to override the defaults.
