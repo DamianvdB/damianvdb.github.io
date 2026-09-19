@@ -82,7 +82,7 @@ nav a:hover { text-decoration: underline; }
 .theme-toggle[hidden] { display: flex !important; visibility: hidden; }
 .theme-toggle:hover { background: var(--mint); }
 .hero { display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 36px 38px; min-height: 710px; position: relative; padding-top: 55px; }
-#hero-network { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .7; }
+#hero-network { position: absolute; inset-block: 0; left: 50%; width: 100vw; height: 100%; transform: translateX(-50%); pointer-events: none; opacity: .7; }
 .hero-copy, .portrait-scene, .hero-foot { position: relative; z-index: 1; }
 .eyebrow { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
 .status-dot { display: inline-block; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--emerald); }
@@ -103,7 +103,8 @@ h1 a:hover { text-decoration-color: var(--emerald); }
 .portrait-ring::before { content: ""; position: absolute; inset: -24px; border: 1px dashed var(--line); border-radius: 50%; z-index: -1; }
 .portrait { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 50%; }
 .orbit-label { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 9px; padding: 11px 17px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 6px 20px #163c3210; border-radius: 28px; font-size: 12px; font-weight: 500; white-space: nowrap; }
-.orbit-label span { color: var(--emerald); font-size: 17px; }
+.emoji-icon { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 1.15em; font-style: normal; font-weight: 400; line-height: 1; }
+.orbit-label .emoji-icon { font-size: 17px; }
 .orbit-mobile { left: 0; top: 15%; transform: rotate(-8deg); }
 .orbit-backend { right: -1%; top: 23%; transform: rotate(7deg); }
 .orbit-product { left: 1%; bottom: 20%; transform: rotate(5deg); }
@@ -180,7 +181,7 @@ h3 { font-size: 29px; letter-spacing: -.03em; }
 .site-footer { padding-block: 44px 35px; display: flex; justify-content: space-between; align-items: center; gap: 24px; font-size: 11px; }
 .site-footer p span { color: var(--muted); }
 .site-footer nav { gap: 20px; flex-wrap: wrap; }
-.site-footer nav a { gap: 9px; font-size: 11px; }
+.site-footer nav a { font-size: 11px; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
 
 @media (prefers-reduced-motion: no-preference) {
   .hero-copy { animation: enter .8s both; }
