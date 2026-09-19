@@ -131,6 +131,17 @@ class ProfilePage {
         await profile.open();
         await profile.capture('responsive-' + width);
         assert.equal(await profile.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        assert.deepEqual(await profile.page.locator('#hero-network').evaluate(canvas => {
+          const bounds = canvas.getBoundingClientRect();
+          return {
+            reachesLeftEdge: bounds.left >= -0.5 && bounds.left <= 0.5,
+            reachesRightEdge: bounds.right >= innerWidth - 0.5 && bounds.right <= innerWidth + 0.5
+          };
+        }), { reachesLeftEdge: true, reachesRightEdge: true });
+        assert.deepEqual(await profile.page.locator('.orbit-label').evaluateAll(labels => labels.map(label => {
+          const bounds = label.getBoundingClientRect();
+          return bounds.left >= 0 && bounds.right <= innerWidth;
+        })), [true, true, true, true]);
         const layoutShift = await profile.page.evaluate(() => window.__layoutShift);
         if (layoutShift) console.log(width, await profile.page.evaluate(() => window.__layoutShiftEntries));
         assert.equal(layoutShift, 0, 'No unexpected layout shifts');

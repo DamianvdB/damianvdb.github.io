@@ -101,6 +101,8 @@
     orbit: 1.08 + (index % 3) * 0.12,
     phase: index * 1.9
   }));
+  const maxOrbit = Math.max(...nodes.map(node => node.orbit));
+  const motionAllowance = 24;
 
   function draw(time = 0) {
     context.clearRect(0, 0, width, height);
@@ -145,6 +147,7 @@
   }
   function resize() {
     const bounds = canvas.getBoundingClientRect();
+    const sceneBounds = scene.getBoundingClientRect();
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     width = bounds.width;
     height = bounds.height;
@@ -152,11 +155,10 @@
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    center = {
-      x: scene.offsetLeft + scene.offsetWidth / 2,
-      y: scene.offsetTop + scene.offsetHeight / 2,
-      radius: scene.offsetWidth * .45
-    };
+    const x = sceneBounds.left - bounds.left + sceneBounds.width / 2;
+    const y = sceneBounds.top - bounds.top + sceneBounds.height / 2;
+    const availableRadius = Math.min(x, width - x, y, height - y) - motionAllowance;
+    center = { x, y, radius: Math.max(0, Math.min(sceneBounds.width * .45, availableRadius / maxOrbit)) };
     render();
   }
   repaintNetwork = render;

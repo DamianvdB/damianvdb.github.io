@@ -52,13 +52,18 @@ class SiteChecks(unittest.TestCase):
                      "BSc Computer Science", "cum laude", "Cape Town", personal_copy):
             self.assertIn(text, HTML)
         self.assertEqual(len(DOC.tags("article")), 4)
+        for emoji in ("👇", "👋", "📱", "⚙️", "💡", "✨"):
+            self.assertIn(emoji, HTML)
         for stale in ("Porfolio", "Senior Android", "17k", "com.redstor.client",
                       "GitHub, lately.", "contributions during the past year",
                       ">/in/damian-van-den-berg<"):
             self.assertNotIn(stale, HTML)
         linkedin = re.search(r'<a href="https://www\.linkedin\.com/in/damian-van-den-berg/"[^>]*>(.*?)</a>', HTML, re.S)
         self.assertIsNotNone(linkedin)
-        self.assertEqual(re.sub(r'<[^>]+>', '', linkedin[1]).strip(), "LinkedIn ↗")
+        self.assertEqual(re.sub(r'<[^>]+>', '', linkedin[1]).strip(), "LinkedIn")
+        footer = re.search(r'<footer class="site-footer wrap">(.*?)</footer>', HTML, re.S)
+        self.assertIsNotNone(footer)
+        self.assertNotIn("↗", footer[1])
 
     def test_metadata_and_person(self):
         metas = {a.get("name", a.get("property")): a.get("content") for a in DOC.tags("meta")}
@@ -169,6 +174,8 @@ class SiteChecks(unittest.TestCase):
         self.assertIn(":focus-visible", css)
         self.assertIn("reduceMotion.matches", js)
         self.assertIn("Africa/Johannesburg", js)
+        self.assertIn("availableRadius / maxOrbit", js)
+        self.assertIn("width: 100vw", css)
 
 
 if __name__ == "__main__":
