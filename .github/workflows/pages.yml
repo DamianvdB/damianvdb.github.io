@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: "17 2 * * *"
 
 permissions:
   contents: read
@@ -21,16 +19,6 @@ jobs:
       - name: Check out the site
         uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Refresh the contribution calendar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/update-github-contributions.mjs
-
       - name: Verify the site
         run: python3 tests/verify.py
 
@@ -42,7 +30,6 @@ jobs:
             --exclude '_site' \
             --exclude '.superpowers' \
             --exclude 'tests' \
-            --exclude 'scripts' \
             --exclude 'README.md' \
             ./ _site/
 
