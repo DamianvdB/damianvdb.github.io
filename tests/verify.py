@@ -44,15 +44,21 @@ class SiteChecks(unittest.TestCase):
             self.assertIn("aria-label", nav)
 
     def test_required_content(self):
+        personal_copy = ("When I’m not building software, I’m usually somewhere on a mountain with my dog. "
+                         "At work, give me a tricky problem and a quiet afternoon to chase it down.")
         for text in ("Software engineer and technical", "co-founder", "Property made simple.",
                      "Principal Android Engineer", "5M+ installs", "4.6 ★",
                      "500K+ installs", "4.5 ★", "10M+ installs", "4.7 ★", "Redstor",
-                     "BSc Computer Science", "cum laude", "Cape Town", "GitHub, lately.",
-                     "contributions during the past year", "/in/damian-van-den-berg"):
+                     "BSc Computer Science", "cum laude", "Cape Town", personal_copy):
             self.assertIn(text, HTML)
         self.assertEqual(len(DOC.tags("article")), 4)
-        for stale in ("Porfolio", "Senior Android", "17k", "com.redstor.client"):
+        for stale in ("Porfolio", "Senior Android", "17k", "com.redstor.client",
+                      "GitHub, lately.", "contributions during the past year",
+                      ">/in/damian-van-den-berg<"):
             self.assertNotIn(stale, HTML)
+        linkedin = re.search(r'<a href="https://www\.linkedin\.com/in/damian-van-den-berg/"[^>]*>(.*?)</a>', HTML, re.S)
+        self.assertIsNotNone(linkedin)
+        self.assertEqual(re.sub(r'<[^>]+>', '', linkedin[1]).strip(), "LinkedIn ↗")
 
     def test_metadata_and_person(self):
         metas = {a.get("name", a.get("property")): a.get("content") for a in DOC.tags("meta")}
@@ -90,38 +96,6 @@ class SiteChecks(unittest.TestCase):
         sitemap = ET.parse(ROOT / "sitemap.xml").getroot()
         namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
         self.assertEqual(sitemap.findtext("s:url/s:loc", namespaces=namespace), "https://damianvdb.github.io/")
-
-    def test_github_contribution_snapshot(self):
-        snapshot = json.loads((ROOT / "data/github-contributions.json").read_text())
-        self.assertEqual(snapshot["login"], "DamianvdB")
-        self.assertEqual(len(snapshot["weeks"]), 52)
-        days = [day for week in snapshot["weeks"] for day in week["days"]]
-        self.assertEqual(len(days), 364)
-        self.assertEqual(snapshot["totalContributions"], sum(day["count"] for day in days))
-        self.assertEqual(len([attrs for attrs in DOC.tags("span") if "contribution-day" in attrs.get("class", "").split()]), 364)
-        displayed_total = re.search(r'<strong data-github-contribution-total>([\d,]+)</strong>', HTML)[1]
-        self.assertEqual(int(displayed_total.replace(",", "")), snapshot["totalContributions"])
-        updater = (ROOT / "scripts/update-github-contributions.mjs").read_text()
-        self.assertIn("process.env.GITHUB_TOKEN", updater)
-        self.assertNotRegex(updater, r"gh[opsu]_[A-Za-z0-9]{20,}")
-        workflow = (ROOT / ".github/workflows/pages.yml").read_text()
-        self.assertIn("schedule:", workflow)
-        self.assertIn("actions/deploy-pages@v4", workflow)
-        modified = snapshot["generatedAt"][:10]
-        profile = json.loads(re.search(r'<script type="application/ld\+json">(.+?)</script>', HTML, re.S)[1])
-        self.assertEqual(profile["dateModified"], modified)
-        sitemap = ET.parse(ROOT / "sitemap.xml").getroot()
-        namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-        self.assertEqual(sitemap.findtext("s:url/s:lastmod", namespaces=namespace), modified)
-
-    def test_github_contribution_fixtures(self):
-        result = subprocess.run(
-            ["node", str(ROOT / "tests/github-contributions.mjs")],
-            capture_output=True,
-            text=True
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("PASS GitHub contribution calendar fixtures for every weekday.", result.stdout)
 
     def test_links(self):
         ids = [a["id"] for _, a in DOC.elements if "id" in a]
@@ -161,6 +135,14 @@ class SiteChecks(unittest.TestCase):
         assets.update(icon["src"] for icon in manifest["icons"])
         for asset in assets:
             self.assertTrue((ROOT / asset).is_file(), asset)
+        self.assertIn('src="images/homely.svg"', HTML)
+        logo = ET.parse(ROOT / "images/homely.svg").getroot()
+        namespace = {"svg": "http://www.w3.org/2000/svg"}
+        self.assertEqual(logo.attrib["viewBox"], "0 33 134 134")
+        self.assertEqual(logo.find(".//svg:rect", namespace).attrib["fill"], "#073A39")
+        mark = logo.find(".//svg:path", namespace)
+        self.assertEqual(mark.attrib["fill"], "#ABFF02")
+        self.assertTrue(mark.attrib["d"].startswith("M603.302 383.203L597.648 377.549"))
 
     def test_responsive_portrait_formats(self):
         sources = DOC.tags("source")
@@ -174,9 +156,7 @@ class SiteChecks(unittest.TestCase):
         self.assertEqual(portrait["srcset"], "images/portrait-480.jpg 480w, images/portrait-960.jpg 960w")
 
     def test_javascript_syntax(self):
-        for script in ("theme.js", "script.js", "scripts/github-contributions-lib.mjs",
-                       "scripts/update-github-contributions.mjs", "tests/github-contributions.mjs",
-                       "tests/browser.cjs"):
+        for script in ("theme.js", "script.js", "tests/browser.cjs"):
             result = subprocess.run(["node", "--check", str(ROOT / script)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 

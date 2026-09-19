@@ -84,8 +84,6 @@ class ProfilePage {
         assert.equal(await page.evaluate(() => document.activeElement.id), 'main');
         assert.match(await page.locator('time').textContent(), /^\d{2}:\d{2}$/);
         assert.equal(await page.getByRole('article').count(), 4);
-        assert.equal(await page.locator('.contribution-day').count(), 364);
-        assert.match(await page.locator('.github-total').textContent(), /\d[\d,]* contributions during the past year/);
         assert.match(await page.getByRole('img', { name: /Damian van den Berg smiling/ }).evaluate(async img => {
           await img.decode();
           return img.currentSrc;
@@ -133,17 +131,6 @@ class ProfilePage {
         await profile.open();
         await profile.capture('responsive-' + width);
         assert.equal(await profile.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-        assert.deepEqual(await profile.page.locator('.contribution-heatmap').evaluate(heatmap => {
-          const cells = heatmap.querySelectorAll('.contribution-day');
-          const frame = heatmap.closest('.contribution-link').getBoundingClientRect();
-          const first = cells[0].getBoundingClientRect();
-          const last = cells[cells.length - 1].getBoundingClientRect();
-          return {
-            count: cells.length,
-            firstVisible: first.left >= frame.left && first.right <= frame.right,
-            lastVisible: last.left >= frame.left && last.right <= frame.right
-          };
-        }), { count: 364, firstVisible: true, lastVisible: true });
         const layoutShift = await profile.page.evaluate(() => window.__layoutShift);
         if (layoutShift) console.log(width, await profile.page.evaluate(() => window.__layoutShiftEntries));
         assert.equal(layoutShift, 0, 'No unexpected layout shifts');
@@ -154,8 +141,6 @@ class ProfilePage {
       scenario('no-javascript', { viewport: { width: 390, height: 844 }, javaScriptEnabled: false, colorScheme: 'dark' }, async profile => {
         await profile.open();
         assert.equal(await profile.page.getByRole('article').count(), 4);
-        assert.equal(await profile.page.locator('.contribution-day').count(), 364);
-        await profile.page.getByRole('heading', { name: 'GitHub, lately.' }).waitFor();
         assert.equal(await profile.theme.count(), 0);
         await profile.page.getByRole('heading', { name: /I make software/ }).waitFor();
         await profile.capture('no-javascript');
