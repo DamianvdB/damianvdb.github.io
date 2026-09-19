@@ -19,7 +19,8 @@ python3 tests/verify.py
 
 The dependency-free checks require Python 3 and Node.js. They verify key content,
 landmarks, heading order, metadata, structured data, links, image dimensions,
-asset references, and JavaScript syntax.
+asset references, search-discovery files, the GitHub contribution snapshot, and
+JavaScript syntax.
 
 For browser verification, install Playwright outside the website or use an existing
 installation, then run against the local server:
@@ -53,4 +54,13 @@ Use `SCENARIOS=constrained-network,homely-focus` to run focused scenarios.
 - Portraits are resized derivatives of Damian's supplied photo, with AVIF and WebP
   sources and JPEG fallbacks. Icons and the 1200 × 630 social preview are committed assets.
 - Keep the canonical and social URLs in sync if a custom domain is added.
+- GitHub Pages deploys through `.github/workflows/pages.yml`. Each deployment and
+  the daily schedule refreshes the public 52-week contribution snapshot before
+  publishing, without exposing a GitHub token to the browser.
+- Google Analytics 4 records standard page views for the public site under the
+  personal `Damian van den Berg website` property. Enhanced measurement is off,
+  so scrolls, outbound clicks, form interactions, videos, and downloads are not tracked.
+- `robots.txt`, `sitemap.xml`, and the `ProfilePage` structured data describe the
+  single public page to search engines. Keep their URL and modified date current
+  when the public address or main content changes.
 - Work-card illustrations are decorative interpretations, not product screenshots.

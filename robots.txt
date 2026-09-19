@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://damianvdb.github.io/sitemap.xml
