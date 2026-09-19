@@ -5,6 +5,7 @@ const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const base = process.env.BASE_URL || 'http://127.0.0.1:4173';
 const evidence = path.resolve(process.env.EVIDENCE_DIR || '.superpowers/sdd/website-profile-plan/evidence');
+const filter = process.env.SCENARIOS?.split(',');
 fs.mkdirSync(evidence, { recursive: true });
 
 class ProfilePage {
@@ -35,6 +36,7 @@ class ProfilePage {
   const browser = await chromium.launch({ headless: true });
   const errors = [];
   async function scenario(name, options, check) {
+    if (filter && !filter.includes(name)) return;
     const context = await browser.newContext(options);
     await context.addInitScript(() => {
       window.__layoutShift = 0;
@@ -144,6 +146,9 @@ class ProfilePage {
       scenario('network-interaction', { viewport: { width: 1440, height: 1000 }, colorScheme: 'light', reducedMotion: 'no-preference' }, async (profile, context) => {
         // Hold animation time constant so pixel changes prove input response, not ambient drift.
         await context.addInitScript(() => {
+          Object.defineProperty(navigator, 'hardwareConcurrency', { value: 8 });
+          Object.defineProperty(navigator, 'deviceMemory', { value: 8 });
+          Object.defineProperty(navigator, 'connection', { value: { saveData: false } });
           const requestFrame = window.requestAnimationFrame.bind(window);
           window.requestAnimationFrame = callback => requestFrame(() => callback(1000));
           window.__networkDraws = 0;
@@ -191,6 +196,73 @@ class ProfilePage {
         await frames();
         assert.ok(await pixels() === still, 'Reduced motion ignores pointer and scroll input');
       }),
+      scenario('constrained-network', { viewport: { width: 1440, height: 1000 }, colorScheme: 'dark', reducedMotion: 'no-preference' }, async (profile, context) => {
+        await context.addInitScript(() => {
+          Object.defineProperty(navigator, 'hardwareConcurrency', { value: 2 });
+          Object.defineProperty(navigator, 'deviceMemory', { value: 1 });
+          Object.defineProperty(navigator, 'connection', { value: { saveData: true } });
+          window.__networkDraws = 0;
+          const clear = CanvasRenderingContext2D.prototype.clearRect;
+          CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+            if (this.canvas.id === 'hero-network') window.__networkDraws += 1;
+            return clear.apply(this, args);
+          };
+        });
+        await profile.open();
+        const page = profile.page;
+        const canvas = page.locator('canvas');
+        const frames = () => page.evaluate(async () => {
+          for (let frame = 0; frame < 8; frame++) await new Promise(requestAnimationFrame);
+        });
+        await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
+        await frames();
+        const before = await page.evaluate(() => window.__networkDraws);
+        assert.ok(before > 0, 'Constrained device retains a rendered decoration');
+        const pixels = await canvas.evaluate(element => element.toDataURL());
+        await page.mouse.move(1120, 360);
+        await page.evaluate(() => window.scrollTo({ top: 160, behavior: 'instant' }));
+        await frames();
+        assert.equal(await page.evaluate(() => window.__networkDraws), before, 'Constrained device does not continuously redraw or paint on input');
+        assert.ok(await canvas.evaluate(element => element.toDataURL()) === pixels, 'Constrained network ignores pointer and scroll motion');
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+        await frames();
+        await page.screenshot({ path: path.join(evidence, 'constrained-network.png'), animations: 'disabled' });
+        await profile.theme.click();
+        assert.match(await profile.theme.getAttribute('aria-label'), /^Theme: light/);
+        await frames();
+        const themeDraws = await page.evaluate(() => window.__networkDraws);
+        assert.ok(themeDraws > before, 'Static network repaints when theme changes');
+        await frames();
+        assert.equal(await page.evaluate(() => window.__networkDraws), themeDraws, 'Theme repaint does not restart animation');
+      }),
+      scenario('homely-focus', { viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' }, async profile => {
+        await profile.open();
+        const page = profile.page;
+        const link = page.getByRole('link', { name: 'Discover Homely' });
+        for (const colorScheme of ['light', 'dark']) {
+          await page.emulateMedia({ colorScheme });
+          await link.focus();
+          assert.ok(await link.evaluate(element => element.matches(':focus-visible')), 'Focus indicator is visible');
+          const contrast = await link.evaluate(element => {
+            const style = getComputedStyle(element);
+            const card = getComputedStyle(element.closest('article'));
+            const luminance = color => {
+              const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
+                value /= 255;
+                return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+              });
+              return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+            };
+            const outline = luminance(style.outlineColor);
+            const background = luminance(card.backgroundColor);
+            return { ratio: (Math.max(outline, background) + .05) / (Math.min(outline, background) + .05), width: parseFloat(style.outlineWidth) };
+          });
+          assert.ok(contrast.width >= 3, 'Focus outline stays at least 3px wide');
+          assert.ok(contrast.ratio >= 3, colorScheme + ' Homely focus contrast must be at least 3:1; got ' + contrast.ratio.toFixed(2));
+          console.log('Homely focus contrast (' + colorScheme + '): ' + contrast.ratio.toFixed(2) + ':1');
+          await page.screenshot({ path: path.join(evidence, 'homely-focus-' + colorScheme + '.png'), animations: 'disabled' });
+        }
+      }),
       scenario('blocked-storage', { viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' }, async (profile, context) => {
         await context.addInitScript(() => {
           Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Blocked', 'SecurityError'); } });
@@ -206,7 +278,7 @@ class ProfilePage {
     for (const failure of failures) console.error(failure.reason);
     assert.equal(failures.length, 0, 'Browser scenario failures');
     assert.deepEqual(errors, [], 'Browser errors');
-    console.log('PASS 8 browser scenarios; no local resource, console, or uncaught JavaScript errors.');
+    console.log('PASS ' + (filter ? filter.length : 10) + ' browser scenarios; no local resource, console, or uncaught JavaScript errors.');
   } finally {
     await browser.close();
   }

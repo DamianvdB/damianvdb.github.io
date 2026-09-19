@@ -67,6 +67,11 @@
   if (!context) return;
   const scene = document.querySelector('.portrait-scene');
   const hero = canvas.parentElement;
+  // Treat low reported CPU/memory or a data-saving preference as a reason to stay static.
+  // Missing capability hints do not imply a constrained device.
+  const limitedHardware = [navigator.hardwareConcurrency, navigator.deviceMemory]
+    .some(value => Number.isFinite(value) && value > 0 && value <= 2);
+  const canAnimate = () => !reduceMotion.matches && !limitedHardware && navigator.connection?.saveData !== true;
   let width = 0;
   let height = 0;
   let frame = 0;
@@ -81,7 +86,7 @@
   // Listen on the hero so the decorative canvas remains transparent to links and touch scrolling.
   // Input handlers only update state; the existing visible-only frame loop does the painting.
   hero.addEventListener('pointermove', event => {
-    if (reduceMotion.matches) return;
+    if (!canAnimate()) return;
     pointer = {
       x: clamp((event.clientX + window.scrollX - origin.x - center.x) / center.radius),
       y: clamp((event.clientY + window.scrollY - origin.y - center.y) / center.radius)
@@ -101,7 +106,7 @@
     context.clearRect(0, 0, width, height);
     context.strokeStyle = ink;
     context.fillStyle = ink;
-    const moving = !reduceMotion.matches;
+    const moving = canAnimate();
     const scroll = moving ? clamp(scrollPosition / Math.max(height, 1)) : 0;
     const points = nodes.map(node => {
       const drift = moving ? Math.sin(time / 7000 + node.phase) * 6 : 0;
@@ -130,7 +135,7 @@
       context.fill();
     });
     context.globalAlpha = 1;
-    if (!reduceMotion.matches && visible && !document.hidden) frame = requestAnimationFrame(draw);
+    if (moving && visible && !document.hidden) frame = requestAnimationFrame(draw);
   }
 
   function render() {
@@ -155,10 +160,12 @@
     render();
   }
   repaintNetwork = render;
-  reduceMotion.addEventListener('change', () => {
+  const updateMotion = () => {
     resetPointer();
     render();
-  });
+  };
+  reduceMotion.addEventListener('change', updateMotion);
+  navigator.connection?.addEventListener?.('change', updateMotion);
   document.addEventListener('visibilitychange', render);
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(([entry]) => {

@@ -31,9 +31,11 @@ PLAYWRIGHT_MODULE=/absolute/path/to/playwright node tests/browser.cjs
 The browser check uses Chromium and checks responsive overflow, image loading,
 keyboard navigation, AVIF decoding, themes and persistence, system changes, reduced motion,
 pointer/scroll network response and offscreen animation suspension,
-disabled storage, disabled JavaScript, and browser errors. Screenshots and traces
+constrained-device fallback, Homely focus contrast, disabled storage, disabled
+JavaScript, and browser errors. Screenshots and traces
 stay in the ignored `.superpowers/sdd/website-profile-plan/evidence/` directory.
 Set `BASE_URL` or `EVIDENCE_DIR` to override the defaults.
+Use `SCENARIOS=constrained-network,homely-focus` to run focused scenarios.
 
 ## Maintenance
 
@@ -45,6 +47,9 @@ Set `BASE_URL` or `EVIDENCE_DIR` to override the defaults.
   Passive input handlers update state for its existing animation loop without intercepting links
   or touch scrolling. It becomes still with reduced motion and
   stops animating when the hero is offscreen or the document is hidden.
+  It also stays static when the browser reports two or fewer CPU cores, 2 GB or
+  less device memory, or data saver. Missing resource hints keep the normal behavior.
+  Static rendering still updates after a resize or theme change.
 - Portraits are resized derivatives of Damian's supplied photo, with AVIF and WebP
   sources and JPEG fallbacks. Icons and the 1200 × 630 social preview are committed assets.
 - Keep the canonical and social URLs in sync if a custom domain is added.
