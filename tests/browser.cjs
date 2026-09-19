@@ -140,7 +140,7 @@ class ProfilePage {
         await profile.open();
         assert.equal(await profile.page.getByRole('article').count(), 4);
         assert.equal(await profile.theme.count(), 0);
-        await profile.page.getByRole('heading', { name: /I build things/ }).waitFor();
+        await profile.page.getByRole('heading', { name: /I make software/ }).waitFor();
         await profile.capture('no-javascript');
       }),
       scenario('network-interaction', { viewport: { width: 1440, height: 1000 }, colorScheme: 'light', reducedMotion: 'no-preference' }, async (profile, context) => {

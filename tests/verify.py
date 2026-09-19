@@ -44,11 +44,12 @@ class SiteChecks(unittest.TestCase):
 
     def test_required_content(self):
         for text in ("Software engineer and technical", "co-founder", "Property made simple.",
-                     "Principal Android Engineer", "500K+ installs", "Redstor",
+                     "Principal Android Engineer", "5M+ installs", "4.6 ★",
+                     "500K+ installs", "4.5 ★", "10M+ installs", "4.7 ★", "Redstor",
                      "BSc Computer Science", "cum laude", "Cape Town"):
             self.assertIn(text, HTML)
         self.assertEqual(len(DOC.tags("article")), 4)
-        for stale in ("Porfolio", "Senior Android", "17k", "4.6", "com.redstor.client"):
+        for stale in ("Porfolio", "Senior Android", "17k", "com.redstor.client"):
             self.assertNotIn(stale, HTML)
 
     def test_metadata_and_person(self):
