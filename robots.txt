@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://damianvdb.github.io/sitemap.xml
+Sitemap: https://damianvandenberg.com/sitemap.xml

@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / "index.html").read_text()
+CANONICAL_ORIGIN = "https://damianvandenberg.com"
 
 
 class Document(HTMLParser):
@@ -72,14 +73,21 @@ class SiteChecks(unittest.TestCase):
             self.assertTrue(metas.get(key), key)
         self.assertEqual(metas["twitter:card"], "summary_large_image")
         canonical = [a["href"] for a in DOC.tags("link") if a.get("rel") == "canonical"]
-        self.assertEqual(canonical, ["https://damianvdb.github.io/"])
+        self.assertEqual(canonical, [f"{CANONICAL_ORIGIN}/"])
         profile = json.loads(re.search(r'<script type="application/ld\+json">(.+?)</script>', HTML, re.S)[1])
         self.assertEqual(profile["@type"], "ProfilePage")
-        self.assertEqual(profile["url"], "https://damianvdb.github.io/")
+        self.assertEqual(profile["url"], f"{CANONICAL_ORIGIN}/")
         person = profile["mainEntity"]
         self.assertEqual(person["@type"], "Person")
         self.assertEqual(person["name"], "Damian van den Berg")
         self.assertEqual(person["alternateName"], "DamianvdB")
+        self.assertEqual(person["@id"], f"{CANONICAL_ORIGIN}/#damian")
+        self.assertEqual(person["url"], f"{CANONICAL_ORIGIN}/")
+        self.assertEqual(person["image"], f"{CANONICAL_ORIGIN}/images/portrait-960.jpg")
+        self.assertEqual(metas["og:url"], f"{CANONICAL_ORIGIN}/")
+        self.assertEqual(metas["og:image"], f"{CANONICAL_ORIGIN}/images/social-preview.jpg")
+        self.assertEqual(metas["twitter:image"], f"{CANONICAL_ORIGIN}/images/social-preview.jpg")
+        self.assertNotIn("damianvdb.github.io", HTML)
         self.assertEqual(len(person["sameAs"]), 4)
         self.assertEqual(metas["google-site-verification"], "VYIGnuUMxqv_en01QhR_OUlLpRbdeWg-qmM2JhYlNP8")
 
@@ -97,10 +105,10 @@ class SiteChecks(unittest.TestCase):
         robots = (ROOT / "robots.txt").read_text()
         self.assertIn("User-agent: *", robots)
         self.assertIn("Allow: /", robots)
-        self.assertIn("Sitemap: https://damianvdb.github.io/sitemap.xml", robots)
+        self.assertIn(f"Sitemap: {CANONICAL_ORIGIN}/sitemap.xml", robots)
         sitemap = ET.parse(ROOT / "sitemap.xml").getroot()
         namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-        self.assertEqual(sitemap.findtext("s:url/s:loc", namespaces=namespace), "https://damianvdb.github.io/")
+        self.assertEqual(sitemap.findtext("s:url/s:loc", namespaces=namespace), f"{CANONICAL_ORIGIN}/")
 
     def test_links(self):
         ids = [a["id"] for _, a in DOC.elements if "id" in a]
