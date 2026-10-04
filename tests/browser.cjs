@@ -343,17 +343,24 @@ async function checkDNotesLayout(page) {
         assert.equal(new URL(page.url()).pathname, '/d-notes/');
         await notes.capture('d-notes-keyboard');
       }),
-      scenario('d-notes-enlarged-text', { viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', colorScheme: 'light' }, async profile => {
+      ...[390, 768, 1440].map(width => scenario(width === 390 ? 'd-notes-enlarged-text' : `d-notes-enlarged-text-${width}`, { viewport: { width, height: 844 }, reducedMotion: 'reduce', colorScheme: 'light' }, async profile => {
         const notes = new DNotesPage(profile.page);
         for (const route of ['/d-notes/', '/d-notes/privacy/', '/d-notes/terms/']) {
           await notes.open(route);
-          const before = await profile.page.getByRole('heading', { level: 1 }).evaluate(heading => parseFloat(getComputedStyle(heading).fontSize));
+          const before = await profile.page.getByRole('heading').evaluateAll(headings => headings.map(heading => parseFloat(getComputedStyle(heading).fontSize)));
           await profile.page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
-          assert.ok(await profile.page.getByRole('heading', { level: 1 }).evaluate(heading => parseFloat(getComputedStyle(heading).fontSize)) >= before * 2, 'Text enlarges to 200%');
-          await notes.capture('d-notes-enlarged-' + (route.split('/')[2] || 'home'));
+          const after = await profile.page.getByRole('heading').evaluateAll(headings => headings.map(heading => ({ text: heading.textContent.trim(), size: parseFloat(getComputedStyle(heading).fontSize) })));
+          for (const [index, heading] of after.entries()) {
+            assert.ok(Math.abs(heading.size - before[index] * 2) < .1, `${width}px: ${heading.text} must double from ${before[index]}px, got ${heading.size}px`);
+          }
+          await notes.capture(`d-notes-enlarged-${width}-` + (route.split('/')[2] || 'home'));
           await checkDNotesLayout(profile.page);
+          assert.deepEqual(await profile.page.getByRole('article').evaluateAll(cards => cards.filter(card => {
+            const bounds = card.getBoundingClientRect();
+            return bounds.left < 0 || bounds.right > innerWidth || card.scrollWidth > card.clientWidth;
+          }).map(card => card.textContent.trim())), [], 'Enlarged feature cards and content fit the viewport');
         }
-      }),
+      })),
       scenario('d-notes-no-javascript', { viewport: { width: 390, height: 844 }, javaScriptEnabled: false, colorScheme: 'dark' }, async profile => {
         const notes = new DNotesPage(profile.page);
         for (const route of ['/d-notes/', '/d-notes/privacy/', '/d-notes/terms/']) {
