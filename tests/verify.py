@@ -291,8 +291,11 @@ class DNotesChecks(unittest.TestCase):
         self.assertIn("Notes, lists, and the odd brilliant idea.", text)
         self.assertIn("D Notes is a colourful Android notebook for thoughts, reminders, photos, recordings, and everything you swear you’ll remember later.", text)
         self.assertIn("Get D Notes on Google Play", text)
-        for term in ("checklist", "reminder", "photos", "files", "PIN", "fingerprint", "fonts", "Google Drive", "restore", "sync", "Android’s own backup"):
+        for term in ("checklist", "reminder", "photos", "files", "PIN", "fingerprint", "fonts", "Google Drive", "restore", "sync", "Android system backup"):
             self.assertIn(term, text)
+        self.assertIn("Your notebook is stored on your device. Backup, sync, and sharing are optional, and Android system backup follows your device settings.", text)
+        self.assertIn("The app uses Firebase Analytics and crash reporting to help improve reliability.", text)
+        self.assertNotIn("Your notes stay on your device unless", text)
         for route, source, doc in self.documents():
             if route == "d-notes/":
                 continue
