@@ -37,6 +37,13 @@ stay in the ignored `.superpowers/sdd/website-profile-plan/evidence/` directory.
 Set `BASE_URL` or `EVIDENCE_DIR` to override the defaults.
 Use `SCENARIOS=constrained-network,homely-focus` to run focused scenarios.
 
+D Notes lives at `/d-notes/`, with separate `/d-notes/privacy/` and
+`/d-notes/terms/` pages. These pages use system light/dark themes, local assets,
+and no runtime JavaScript or analytics. D Notes browser scenarios cover all three
+routes on phone, tablet, and desktop in both themes, 200% text enlargement,
+keyboard navigation, reduced motion, disabled JavaScript, and 44px touch targets.
+Use `SCENARIOS=d-notes-enlarged-text,d-notes-keyboard` for a focused run.
+
 ## Maintenance
 
 - Edit `index.html` for content and links. The ClearScore timeline starts at the
@@ -54,10 +61,14 @@ Use `SCENARIOS=constrained-network,homely-focus` to run focused scenarios.
   sources and JPEG fallbacks. Icons and the 1200 × 630 social preview are committed assets.
 - Keep the canonical and social URLs in sync if a custom domain is added.
 - GitHub Pages deploys through `.github/workflows/pages.yml` whenever `main` changes.
-- Google Analytics 4 records standard page views for the public site under the
+- Google Analytics 4 records standard page views for the personal homepage under the
   personal `Damian van den Berg website` property. Enhanced measurement is off,
   so scrolls, outbound clicks, form interactions, videos, and downloads are not tracked.
-- `robots.txt`, `sitemap.xml`, and the `ProfilePage` structured data describe the
-  single public page to search engines. Keep their URL and modified date current
+- `robots.txt` and `sitemap.xml` describe the public routes; `ProfilePage`
+  structured data describes the personal homepage and `SoftwareApplication`
+  describes D Notes. Keep their URLs and modified dates current
   when the public address or main content changes.
 - Work-card illustrations are decorative interpretations, not product screenshots.
+- D Notes uses original app/store imagery documented in `d-notes/assets/README.md`.
+  Its legal copy was checked against the shipping-app source repository and should
+  be revisited when backup, telemetry, purchases, or data-handling behavior changes.

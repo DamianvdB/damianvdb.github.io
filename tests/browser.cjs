@@ -32,6 +32,38 @@ class ProfilePage {
   }
 }
 
+class DNotesPage {
+  constructor(page) { this.page = page; }
+  async open(route = '/d-notes/') {
+    const response = await this.page.goto(base + route);
+    assert.equal(response.status(), 200, route);
+    await this.page.getByRole('heading', { level: 1 }).waitFor();
+  }
+  async capture(name) {
+    for (const image of await this.page.getByRole('img').all()) {
+      // Capture is observational: instant scrolling avoids smooth-scroll stability
+      // waits in JavaScript-disabled contexts while still loading lazy images.
+      await image.evaluate(image => image.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await image.evaluate(image => image.decode());
+    }
+    await this.page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await this.page.screenshot({ path: path.join(evidence, name + '.png'), fullPage: true, animations: 'disabled' });
+  }
+}
+
+async function checkDNotesLayout(page) {
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'No horizontal overflow');
+  const shortTargets = await page.getByRole('link').evaluateAll(links => links.filter(link => {
+    const bounds = link.getBoundingClientRect();
+    return bounds.width < 44 || bounds.height < 44;
+  }).map(link => link.textContent.trim()));
+  assert.deepEqual(shortTargets, [], 'All links have 44px touch targets');
+  assert.deepEqual(await page.locator('img').evaluateAll(images => images.filter(image => !image.complete || !image.naturalWidth).map(image => image.src)), [], 'Images loaded');
+  assert.deepEqual(await page.locator('img').evaluateAll(images => images.filter(image =>
+    image.naturalWidth !== Number(image.getAttribute('width')) || image.naturalHeight !== Number(image.getAttribute('height'))
+  ).map(image => image.src)), [], 'Correct intrinsic image dimensions');
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const errors = [];
@@ -275,6 +307,73 @@ class ProfilePage {
           console.log('homely focus contrast (' + colorScheme + '): ' + contrast.ratio.toFixed(2) + ':1');
           await page.screenshot({ path: path.join(evidence, 'homely-focus-' + colorScheme + '.png'), animations: 'disabled' });
         }
+      }),
+      ...[320, 768, 1440].flatMap(width => ['light', 'dark'].map(colorScheme =>
+        scenario(`d-notes-${width}-${colorScheme}`, { viewport: { width, height: 1000 }, colorScheme }, async profile => {
+          const notes = new DNotesPage(profile.page);
+          const page = notes.page;
+          for (const route of ['/d-notes/', '/d-notes/privacy/', '/d-notes/terms/']) {
+            await notes.open(route);
+            assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), colorScheme === 'dark' ? 'rgb(32, 33, 32)' : 'rgb(248, 245, 239)');
+            await notes.capture(`d-notes-${width}-${colorScheme}-${route.split('/')[2] || 'home'}`);
+            await checkDNotesLayout(page);
+            assert.deepEqual(await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => new URL(entry.name).origin !== location.origin).map(entry => entry.name)), [], 'D Notes loads no third-party assets or tracking');
+            if (route !== '/d-notes/') assert.equal(await page.evaluate(() => document.getAnimations().length), 0, 'Legal pages have no decorative animation');
+          }
+        })
+      )),
+      scenario('d-notes-keyboard', { viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' }, async profile => {
+        const notes = new DNotesPage(profile.page);
+        const page = notes.page;
+        await notes.open();
+        await page.keyboard.press('Tab');
+        assert.equal(await page.getByRole('link', { name: 'Skip to content' }).evaluate(link => link === document.activeElement), true);
+        await page.keyboard.press('Enter');
+        assert.equal(await page.evaluate(() => document.activeElement.id), 'main');
+        const mainLinks = await page.getByRole('main').getByRole('link').all();
+        for (const link of mainLinks) {
+          await page.keyboard.press('Tab');
+          assert.equal(await link.evaluate(link => link === document.activeElement && link.matches(':focus-visible') && parseFloat(getComputedStyle(link).outlineWidth) >= 3), true, 'Main links follow keyboard order with visible focus');
+        }
+        await page.getByRole('link', { name: 'Read the privacy policy' }).click();
+        assert.equal(new URL(page.url()).pathname, '/d-notes/privacy/');
+        await page.getByRole('link', { name: 'Terms', exact: true }).click();
+        assert.equal(new URL(page.url()).pathname, '/d-notes/terms/');
+        await page.getByRole('link', { name: 'Back to D Notes' }).click();
+        assert.equal(new URL(page.url()).pathname, '/d-notes/');
+        await notes.capture('d-notes-keyboard');
+      }),
+      scenario('d-notes-enlarged-text', { viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', colorScheme: 'light' }, async profile => {
+        const notes = new DNotesPage(profile.page);
+        for (const route of ['/d-notes/', '/d-notes/privacy/', '/d-notes/terms/']) {
+          await notes.open(route);
+          const before = await profile.page.getByRole('heading', { level: 1 }).evaluate(heading => parseFloat(getComputedStyle(heading).fontSize));
+          await profile.page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
+          assert.ok(await profile.page.getByRole('heading', { level: 1 }).evaluate(heading => parseFloat(getComputedStyle(heading).fontSize)) >= before * 2, 'Text enlarges to 200%');
+          await notes.capture('d-notes-enlarged-' + (route.split('/')[2] || 'home'));
+          await checkDNotesLayout(profile.page);
+        }
+      }),
+      scenario('d-notes-no-javascript', { viewport: { width: 390, height: 844 }, javaScriptEnabled: false, colorScheme: 'dark' }, async profile => {
+        const notes = new DNotesPage(profile.page);
+        for (const route of ['/d-notes/', '/d-notes/privacy/', '/d-notes/terms/']) {
+          await notes.open(route);
+          await notes.capture('d-notes-no-javascript-' + (route.split('/')[2] || 'home'));
+          await checkDNotesLayout(profile.page);
+          assert.equal(await profile.page.getByRole('contentinfo').getByRole('link', { name: 'Support', exact: true }).getAttribute('href'), 'mailto:dvdb.software@gmail.com');
+        }
+        await profile.page.getByRole('link', { name: 'Back to D Notes' }).click();
+        assert.equal(await profile.page.getByRole('link', { name: 'Get D Notes on Google Play' }).count(), 2);
+      }),
+      scenario('d-notes-reduced-motion', { viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', colorScheme: 'dark' }, async profile => {
+        const notes = new DNotesPage(profile.page);
+        await notes.open();
+        assert.equal(await profile.page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior), 'auto');
+        assert.equal(await profile.page.evaluate(() => document.getAnimations().length), 0);
+        await profile.page.getByRole('link', { name: 'The little details' }).click();
+        assert.equal(new URL(profile.page.url()).hash, '#features');
+        assert.equal(await profile.page.evaluate(() => document.getAnimations().length), 0);
+        await notes.capture('d-notes-reduced-motion');
       }),
       scenario('blocked-storage', { viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' }, async (profile, context) => {
         await context.addInitScript(() => {

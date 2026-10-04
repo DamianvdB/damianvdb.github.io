@@ -1,10 +1,11 @@
 """Dependency-free checks for the public page. Run with python3 tests/verify.py."""
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urljoin
 import json
 import re
 import subprocess
+import struct
 import unittest
 import xml.etree.ElementTree as ET
 
@@ -184,6 +185,136 @@ class SiteChecks(unittest.TestCase):
         self.assertIn("Africa/Johannesburg", js)
         self.assertIn("availableRadius / maxOrbit", js)
         self.assertIn("width: 100vw", css)
+
+
+class DNotesChecks(unittest.TestCase):
+    routes = ("d-notes/", "d-notes/privacy/", "d-notes/terms/")
+
+    def documents(self):
+        for route in self.routes:
+            source = (ROOT / route / "index.html").read_text()
+            yield route, source, Document(source)
+
+    def test_routes_landmarks_and_links(self):
+        for route, source, doc in self.documents():
+            with self.subTest(route=route):
+                self.assertEqual(doc.tags("html")[0]["lang"], "en")
+                for tag in ("header", "main", "footer", "h1"):
+                    self.assertEqual(len(doc.tags(tag)), 1, tag)
+                self.assertEqual(doc.headings[0], 1)
+                self.assertTrue(all(b <= a + 1 for a, b in zip(doc.headings, doc.headings[1:])))
+                ids = [a["id"] for _, a in doc.elements if "id" in a]
+                self.assertEqual(len(ids), len(set(ids)))
+                self.assertIn('href="#main"', source)
+                for nav in doc.tags("nav"):
+                    self.assertTrue(nav.get("aria-label"))
+                for section in doc.tags("section"):
+                    self.assertIn(section.get("aria-labelledby"), ids)
+                resolved = set()
+                for link in doc.tags("a"):
+                    href = link["href"]
+                    if href.startswith("#"):
+                        self.assertIn(href[1:], ids)
+                    absolute = urljoin(CANONICAL_ORIGIN + "/" + route, href)
+                    resolved.add(absolute)
+                    if href.startswith("mailto:"):
+                        self.assertEqual(href, "mailto:dvdb.software@gmail.com")
+                        continue
+                    self.assertEqual(urlsplit(absolute).scheme, "https")
+                    if urlsplit(absolute).netloc == urlsplit(CANONICAL_ORIGIN).netloc:
+                        target = ROOT / urlsplit(absolute).path.lstrip("/")
+                        self.assertTrue((target / "index.html").is_file() if target.is_dir() else target.is_file(), href)
+                    if link.get("target") == "_blank":
+                        self.assertTrue({"noopener", "noreferrer"} <= set(link.get("rel", "").split()))
+                self.assertIn("mailto:dvdb.software@gmail.com", resolved)
+                for legal in self.routes[1:]:
+                    self.assertIn(CANONICAL_ORIGIN + "/" + legal, resolved)
+
+    def test_metadata_and_structured_data(self):
+        for route, source, doc in self.documents():
+            with self.subTest(route=route):
+                canonical = [a["href"] for a in doc.tags("link") if a.get("rel") == "canonical"]
+                self.assertEqual(canonical, [CANONICAL_ORIGIN + "/" + route])
+                metas = {a.get("name", a.get("property")): a.get("content") for a in doc.tags("meta")}
+                for name in ("description", "viewport", "color-scheme"):
+                    self.assertTrue(metas.get(name))
+                self.assertEqual(len(doc.tags("title")), 1)
+                if route == "d-notes/":
+                    for name in ("og:title", "og:description", "og:type", "og:url", "og:image", "og:image:alt", "twitter:card", "twitter:image", "twitter:image:alt"):
+                        self.assertTrue(metas.get(name), name)
+                    self.assertEqual(metas["og:url"], canonical[0])
+                    application = json.loads(re.search(r'<script type="application/ld\+json">(.+?)</script>', source, re.S)[1])
+                    self.assertEqual(application["@type"], "SoftwareApplication")
+                    self.assertEqual(application["name"], "D Notes")
+                    self.assertEqual(application["operatingSystem"], "Android")
+                    self.assertEqual(application["url"], canonical[0])
+                    self.assertEqual(application["downloadUrl"], "https://play.google.com/store/apps/details?id=com.dvdb.bergnotes")
+                    self.assertEqual(application["image"], metas["og:image"])
+                    self.assertTrue((ROOT / urlsplit(metas["og:image"]).path.lstrip("/")).is_file())
+        self.assertIn('href="https://damianvandenberg.com/d-notes/"', HTML)
+        profile = json.loads(re.search(r'<script type="application/ld\+json">(.+?)</script>', HTML, re.S)[1])
+        self.assertNotIn("SoftwareApplication", json.dumps(profile))
+        self.assertNotIn("d-notes/", json.dumps(profile))
+
+    def test_assets_https_and_no_tracking(self):
+        for route, source, doc in self.documents():
+            with self.subTest(route=route):
+                self.assertNotRegex(source, r"http://|//www\.googletagmanager|gtag\(|google-analytics|G-9W9T91DGRW")
+                for script in doc.tags("script"):
+                    self.assertEqual(script.get("type"), "application/ld+json")
+                    self.assertNotIn("src", script)
+                for tag, attrs in doc.elements:
+                    for attr in ("src", "href"):
+                        reference = attrs.get(attr, "")
+                        if not reference or reference.startswith(("#", "mailto:")):
+                            continue
+                        absolute = urljoin(CANONICAL_ORIGIN + "/" + route, reference)
+                        self.assertEqual(urlsplit(absolute).scheme, "https")
+                        if urlsplit(absolute).netloc != urlsplit(CANONICAL_ORIGIN).netloc:
+                            continue
+                        asset = ROOT / urlsplit(absolute).path.lstrip("/")
+                        self.assertTrue(asset.exists(), reference)
+                        if tag == "img" and attr == "src":
+                            self.assertIn("alt", attrs)
+                            data = asset.read_bytes()
+                            self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+                            self.assertEqual(struct.unpack(">II", data[16:24]), (int(attrs["width"]), int(attrs["height"])))
+        css = (ROOT / "d-notes/styles.css").read_text()
+        self.assertNotIn("@import", css)
+        self.assertNotIn("url(", css)
+        for requirement in ("prefers-color-scheme: dark", "prefers-reduced-motion: reduce", ":focus-visible", "#F44336"):
+            self.assertIn(requirement, css)
+
+    def test_copy_and_legal_requirements(self):
+        homepage = (ROOT / "d-notes/index.html").read_text()
+        text = re.sub(r"<[^>]+>", "", homepage)
+        self.assertIn("Notes, lists, and the odd brilliant idea.", text)
+        self.assertIn("D Notes is a colourful Android notebook for thoughts, reminders, photos, recordings, and everything you swear you’ll remember later.", text)
+        self.assertIn("Get D Notes on Google Play", text)
+        for term in ("checklist", "reminder", "photos", "files", "PIN", "fingerprint", "fonts", "Google Drive", "restore", "sync", "Android’s own backup"):
+            self.assertIn(term, text)
+        for route, source, doc in self.documents():
+            if route == "d-notes/":
+                continue
+            self.assertIn('datetime="2026-10-04"', source)
+            self.assertIn("Back to D Notes", source)
+            self.assertEqual(doc.tags("html")[0]["class"], "legal-page")
+            content = re.search(r"<main\b[^>]*>(.*?)</main>", source, re.S)[1]
+            words = re.sub(r"<[^>]+>", " ", content).split()
+            self.assertLess(len(words), 700 if "privacy" in route else 450)
+        privacy = (ROOT / "d-notes/privacy/index.html").read_text()
+        for term in ("drive.file", "drive.appdata", "email", "Firebase Analytics", "Crashlytics", "filenames", "Google Play", "retention", "uninstall", "Revoking", "Limited Use", "do not sell"):
+            self.assertIn(term, privacy)
+        terms = (ROOT / "d-notes/terms/index.html").read_text()
+        for term in ("South African law", "refund", "backups", "Google Drive", "liability", "uninterrupted"):
+            self.assertIn(term, terms)
+
+    def test_sitemap_routes_and_dates(self):
+        sitemap = ET.parse(ROOT / "sitemap.xml").getroot()
+        ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        entries = {url.findtext("s:loc", namespaces=ns): url.findtext("s:lastmod", namespaces=ns) for url in sitemap}
+        for route in ("", *self.routes):
+            self.assertEqual(entries[CANONICAL_ORIGIN + "/" + route], "2026-10-04")
 
 
 if __name__ == "__main__":
