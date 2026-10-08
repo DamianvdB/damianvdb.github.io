@@ -2,6 +2,8 @@
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit, urljoin
+from urllib.robotparser import RobotFileParser
+from datetime import date, datetime
 import json
 import re
 import subprocess
@@ -78,6 +80,9 @@ class SiteChecks(unittest.TestCase):
         profile = json.loads(re.search(r'<script type="application/ld\+json">(.+?)</script>', HTML, re.S)[1])
         self.assertEqual(profile["@type"], "ProfilePage")
         self.assertEqual(profile["url"], f"{CANONICAL_ORIGIN}/")
+        self.assertRegex(profile["dateModified"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$")
+        modified = datetime.fromisoformat(profile["dateModified"].replace("Z", "+00:00"))
+        self.assertIsNotNone(modified.tzinfo)
         person = profile["mainEntity"]
         self.assertEqual(person["@type"], "Person")
         self.assertEqual(person["name"], "Damian van den Berg")
@@ -109,7 +114,34 @@ class SiteChecks(unittest.TestCase):
         self.assertIn(f"Sitemap: {CANONICAL_ORIGIN}/sitemap.xml", robots)
         sitemap = ET.parse(ROOT / "sitemap.xml").getroot()
         namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-        self.assertEqual(sitemap.findtext("s:url/s:loc", namespaces=namespace), f"{CANONICAL_ORIGIN}/")
+        urls = [entry.findtext("s:loc", namespaces=namespace) for entry in sitemap]
+        expected = {f"{CANONICAL_ORIGIN}{route}" for route in
+                    ("/", "/d-notes/", "/d-notes/privacy/", "/d-notes/terms/")}
+        self.assertEqual(set(urls), expected)
+        self.assertEqual(len(urls), len(expected), "Duplicate sitemap URLs")
+        rules = RobotFileParser()
+        rules.parse(robots.splitlines())
+        for url in urls:
+            with self.subTest(url=url):
+                source = (ROOT / urlsplit(url).path.lstrip("/") / "index.html").read_text()
+                doc = Document(source)
+                canonical = [a.get("href") for a in doc.tags("link") if a.get("rel") == "canonical"]
+                self.assertEqual(canonical, [url])
+                self.assertTrue(rules.can_fetch("Googlebot", url), "Sitemap URL blocked by robots.txt")
+                for meta in doc.tags("meta"):
+                    if meta.get("name", "").lower() in ("robots", "googlebot"):
+                        directives = set(re.split(r"[\s,]+", meta.get("content", "").lower()))
+                        self.assertFalse({"noindex", "none"} & directives, "Sitemap URL excludes indexing")
+
+    def test_google_local_excluded_from_search(self):
+        source = (ROOT / "google-local/index.html").read_text()
+        directives = [a.get("content", "").lower() for a in Document(source).tags("meta")
+                      if a.get("name", "").lower() == "robots"]
+        self.assertEqual(directives, ["noindex, follow"])
+        rules = RobotFileParser()
+        rules.parse((ROOT / "robots.txt").read_text().splitlines())
+        for route in ("/google-local/", "/google-local/index.html"):
+            self.assertTrue(rules.can_fetch("Googlebot", CANONICAL_ORIGIN + route))
 
     def test_links(self):
         ids = [a["id"] for _, a in DOC.elements if "id" in a]
@@ -316,7 +348,10 @@ class DNotesChecks(unittest.TestCase):
         sitemap = ET.parse(ROOT / "sitemap.xml").getroot()
         ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
         entries = {url.findtext("s:loc", namespaces=ns): url.findtext("s:lastmod", namespaces=ns) for url in sitemap}
-        for route in ("", *self.routes):
+        homepage_modified = entries[CANONICAL_ORIGIN + "/"]
+        self.assertEqual(date.fromisoformat(homepage_modified).isoformat(), homepage_modified)
+        self.assertGreaterEqual(homepage_modified, "2026-10-04")
+        for route in self.routes:
             self.assertEqual(entries[CANONICAL_ORIGIN + "/" + route], "2026-10-04")
 
 
