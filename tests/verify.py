@@ -331,17 +331,18 @@ class DNotesChecks(unittest.TestCase):
         for route, source, doc in self.documents():
             if route == "d-notes/":
                 continue
-            self.assertIn('datetime="2026-10-04"', source)
+            effective = doc.tags("time")[0]["datetime"]
+            self.assertEqual(date.fromisoformat(effective).isoformat(), effective)
             self.assertIn("Back to D Notes", source)
             self.assertEqual(doc.tags("html")[0]["class"], "legal-page")
             content = re.search(r"<main\b[^>]*>(.*?)</main>", source, re.S)[1]
             words = re.sub(r"<[^>]+>", " ", content).split()
             self.assertLess(len(words), 700 if "privacy" in route else 450)
         privacy = (ROOT / "d-notes/privacy/index.html").read_text()
-        for term in ("drive.file", "drive.appdata", "email", "Firebase Analytics", "Crashlytics", "filenames", "Google Play", "retention", "uninstall", "Revoking", "Limited Use", "do not sell"):
+        for term in ("drive.file", "drive.appdata", "email", "Firebase Analytics", "Crashlytics", "filenames", "Google Play", "retention", "uninstall", "Revoking", "Limited Use", "do not sell", "authorised assistants", "search snippets", "Attachment contents", "outside your device", "Connected Apps"):
             self.assertIn(term, privacy)
         terms = (ROOT / "d-notes/terms/index.html").read_text()
-        for term in ("South African law", "refund", "backups", "Google Drive", "liability", "uninterrupted"):
+        for term in ("South African law", "refund", "backups", "Google Drive", "liability", "uninterrupted", "optional assistant integrations", "Review requests and results", "Connected Apps"):
             self.assertIn(term, terms)
 
     def test_sitemap_routes_and_dates(self):
@@ -351,8 +352,13 @@ class DNotesChecks(unittest.TestCase):
         homepage_modified = entries[CANONICAL_ORIGIN + "/"]
         self.assertEqual(date.fromisoformat(homepage_modified).isoformat(), homepage_modified)
         self.assertGreaterEqual(homepage_modified, "2026-10-04")
-        for route in self.routes:
-            self.assertEqual(entries[CANONICAL_ORIGIN + "/" + route], "2026-10-04")
+        for route, source, doc in self.documents():
+            modified = entries[CANONICAL_ORIGIN + "/" + route]
+            self.assertEqual(date.fromisoformat(modified).isoformat(), modified)
+            if route == "d-notes/":
+                self.assertEqual(modified, "2026-10-04")
+            else:
+                self.assertEqual(modified, doc.tags("time")[0]["datetime"])
 
 
 if __name__ == "__main__":
