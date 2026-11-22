@@ -97,15 +97,16 @@ class SiteChecks(unittest.TestCase):
         self.assertEqual(len(person["sameAs"]), 4)
         self.assertEqual(metas["google-site-verification"], "VYIGnuUMxqv_en01QhR_OUlLpRbdeWg-qmM2JhYlNP8")
 
-    def test_page_view_analytics(self):
-        self.assertEqual(HTML.count("G-9W9T91DGRW"), 2)
-        analytics_scripts = [
-            script for script in DOC.tags("script")
-            if script.get("src", "").startswith("https://www.googletagmanager.com/gtag/js")
-        ]
-        self.assertEqual(len(analytics_scripts), 1)
-        self.assertIn("async", analytics_scripts[0])
-        self.assertNotIn("enhanced_measurement", HTML)
+    def test_scripts_on_shared_origin_are_first_party(self):
+        for path in [ROOT / "index.html", *ROOT.glob("d-notes/**/index.html"),
+                     *ROOT.glob("google-local/**/index.html")]:
+            with self.subTest(path=path.relative_to(ROOT)):
+                document = Document(path.read_text())
+                for script in document.tags("script"):
+                    src = script.get("src")
+                    if src:
+                        origin = urlsplit(urljoin(CANONICAL_ORIGIN, src)).netloc
+                        self.assertEqual(origin, urlsplit(CANONICAL_ORIGIN).netloc, src)
 
     def test_search_discovery_files(self):
         robots = (ROOT / "robots.txt").read_text()
@@ -337,9 +338,9 @@ class DNotesChecks(unittest.TestCase):
             self.assertEqual(doc.tags("html")[0]["class"], "legal-page")
             content = re.search(r"<main\b[^>]*>(.*?)</main>", source, re.S)[1]
             words = re.sub(r"<[^>]+>", " ", content).split()
-            self.assertLess(len(words), 700 if "privacy" in route else 450)
+            self.assertLess(len(words), 810 if "privacy" in route else 450)
         privacy = (ROOT / "d-notes/privacy/index.html").read_text()
-        for term in ("drive.file", "drive.appdata", "email", "Firebase Analytics", "Crashlytics", "filenames", "Google Play", "retention", "uninstall", "Revoking", "Limited Use", "do not sell", "authorised assistants", "search snippets", "Attachment contents", "outside your device", "Connected Apps"):
+        for term in ("drive.file", "drive.appdata", "email", "Firebase Analytics", "Crashlytics", "filenames", "Google Play", "retention", "uninstall", "Revoking", "Limited Use", "do not sell", "authorised assistants", "search snippets", "Attachment contents", "outside your device", "Connected Apps", "Cloudflare", "essential session cookie"):
             self.assertIn(term, privacy)
         terms = (ROOT / "d-notes/terms/index.html").read_text()
         for term in ("South African law", "refund", "backups", "Google Drive", "liability", "uninterrupted", "optional assistant integrations", "Review requests and results", "Connected Apps"):

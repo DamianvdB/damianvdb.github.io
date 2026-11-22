@@ -61,9 +61,7 @@ Use `SCENARIOS=d-notes-enlarged-text,d-notes-keyboard` for a focused run.
   sources and JPEG fallbacks. Icons and the 1200 × 630 social preview are committed assets.
 - Keep the canonical and social URLs in sync if a custom domain is added.
 - GitHub Pages deploys through `.github/workflows/pages.yml` whenever `main` changes.
-- Google Analytics 4 records standard page views for the personal homepage under the
-  personal `Damian van den Berg website` property. Enhanced measurement is off,
-  so scrolls, outbound clicks, form interactions, videos, and downloads are not tracked.
+- The D Notes web editor at `/notes/` shares the site's origin. Keep scripts on this origin first-party.
 - `robots.txt` and `sitemap.xml` describe the public routes; `ProfilePage`
   structured data describes the personal homepage and `SoftwareApplication`
   describes D Notes. Keep their URLs and modified dates current
