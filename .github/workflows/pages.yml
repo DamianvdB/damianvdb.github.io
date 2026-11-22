@@ -26,20 +26,22 @@ jobs:
         run: |
           mkdir _site
           rsync -a \
-            --exclude '.git*' \
+            --exclude '.*' \
             --exclude '_site' \
-            --exclude '.superpowers' \
             --exclude 'tests' \
             --exclude 'README.md' \
             ./ _site/
+          mkdir -p _site/.well-known
+          cp .well-known/assetlinks.json _site/.well-known/assetlinks.json
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+          include-hidden-files: true
 
   deploy:
     needs: build
