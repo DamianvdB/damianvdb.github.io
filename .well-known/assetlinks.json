@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.dvdb.bergnotes",
+      "sha256_cert_fingerprints": ["81:2C:42:4F:62:56:19:BD:31:18:B7:40:99:B5:CB:3B:26:68:F7:D0:BE:CE:AA:78:6B:81:16:21:B4:5F:7E:35"]
+    }
+  }
+]
